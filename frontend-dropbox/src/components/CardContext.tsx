@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import axios from 'axios';
+import { useState } from "react";
+import axios from "axios";
 
 interface CardProps {
   id: number;
@@ -12,37 +12,54 @@ function CardContext({ id, title, description }: CardProps) {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const truncateDescription = (text: string | null, maxLength: number = 60) => {
-    if (!text) return '';
+    if (!text) return "";
     return text.length > maxLength ? `${text.substring(0, maxLength)}...` : text;
   };
 
-  const handleDownload = async () => {
+  const handleDownload = async (id: number, filename: string) => {
     try {
       setIsDownloading(true);
-      console.log('Iniciando download do arquivo ID:', id);
+      console.log("Iniciando download do arquivo:", id);
 
-      const response = await axios.get(`http://localhost:3000/archives/download/${id}`, {
-        responseType: 'blob',
-      });
+      const response = await axios.get(
+        `http://localhost:3000/archives/download/${id}`,
+        {
+          responseType: "blob", // ⚠️ necessário para receber binário
+        }
+      );
 
-      console.log('Download concluído:', response);
+      // Determina o tipo MIME correto retornado pelo backend
+      const contentType = response.headers["content-type"] || "application/octet-stream";
 
-      const contentDisposition = response.headers['content-disposition'];
-      const filename = contentDisposition
-        ? decodeURIComponent(contentDisposition.split('filename=')[1].replace(/['"]/g, ''))
-        : `arquivo-${id}.bin`;
+      // Cria um Blob com o tipo correto
+      const blob = new Blob([response.data], { type: contentType });
 
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
+      // Cria URL temporária
+      const url = window.URL.createObjectURL(blob);
+
+      // Cria elemento <a> invisível e dispara o download
+      const link = document.createElement("a");
       link.href = url;
-      link.setAttribute('download', filename);
+
+      // Define o nome do arquivo — se não vier, usa o title
+      const safeFilename = filename || `${title}.bin`;
+      link.setAttribute("download", safeFilename);
+
       document.body.appendChild(link);
       link.click();
+
+      // Libera memória e remove o link
       link.remove();
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Erro ao baixar o arquivo:', error);
-      alert('Falha ao baixar o arquivo. Tente novamente.');
+
+      console.log("Download concluído com sucesso!");
+    } catch (err: any) {
+      console.error("Erro ao baixar o arquivo:", err);
+      if (err.response?.status === 404) {
+        alert("Arquivo não encontrado.");
+      } else {
+        alert("Erro ao baixar o arquivo. Tente novamente.");
+      }
     } finally {
       setIsDownloading(false);
     }
@@ -61,7 +78,10 @@ function CardContext({ id, title, description }: CardProps) {
             {title}
           </h3>
           {description && (
-            <p className="mt-1 text-sm text-gray-500 line-clamp-2" title={description}>
+            <p
+              className="mt-1 text-sm text-gray-500 line-clamp-2"
+              title={description}
+            >
               {truncateDescription(description)}
             </p>
           )}
@@ -69,23 +89,19 @@ function CardContext({ id, title, description }: CardProps) {
 
         {/* Botão de Download */}
         <button
-          onClick={handleDownload}
+          onClick={() => handleDownload(id, title)}
           disabled={isDownloading}
           className={`shrink-0 p-2 rounded-full transition-colors duration-200 ${
             isDownloading
-              ? 'text-blue-400 cursor-wait'
+              ? "text-blue-400 cursor-wait"
               : isHovering
-              ? 'bg-blue-50 text-blue-600'
-              : 'text-gray-400 hover:text-gray-600'
+              ? "bg-blue-50 text-blue-600"
+              : "text-gray-400 hover:text-gray-600"
           }`}
           title="Baixar arquivo"
         >
           {isDownloading ? (
-            <svg
-              className="w-5 h-5 animate-spin"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
               <circle
                 className="opacity-25"
                 cx="12"

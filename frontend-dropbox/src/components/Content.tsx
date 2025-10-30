@@ -29,7 +29,7 @@ function Content() {
       console.log('Resposta completa:', response);
       console.log('Status:', response.status);
       console.log('Dados recebidos:', response.data);
-      
+
       if (Array.isArray(response.data)) {
         setFiles(response.data);
         console.log('Arquivos atualizados no estado:', response.data.length, 'arquivos');
@@ -51,44 +51,33 @@ function Content() {
     }
   };
 
-  const handleDownload = async (id: number) => {
-  try {
-    console.log('Iniciando download do arquivo:', id);
-    const response = await axios.get(`http://localhost:3000/archives/${id}`, {
-      responseType: 'arraybuffer', // arraybuffer evita problemas de encodificação
-    });
-    console.log('Download concluído:', response);
+  const handleDownload = async (id: number, filename: string) => {
+    try {
+      console.log('Iniciando download do arquivo:', id);
 
-    // obter content-type e content-disposition
-    const contentType = response.headers['content-type'] || 'application/octet-stream';
-    const contentDisposition = response.headers['content-disposition'];
-    let filename = `arquivo-${id}.bin`;
+      const response = await axios.get(`http://localhost:3000/archives/download/${id}`, {
+        responseType: 'blob', // Crucial: receber como binário
+      });
 
-    if (contentDisposition) {
-      const match = /filename\*?=(?:UTF-8'')?["']?([^;"']+)["']?/i.exec(contentDisposition);
-      if (match && match[1]) {
-        filename = decodeURIComponent(match[1]);
+      // Cria URL temporária para o blob
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename); // Usa o nome original
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Erro ao baixar o arquivo:', err);
+      if (err.response?.status === 404) {
+        alert('Arquivo não encontrado.');
       } else {
-        // fallback quando houver filename="nome.ext"
-        const fallback = /filename="?([^"]+)"?/.exec(contentDisposition);
-        if (fallback && fallback[1]) filename = fallback[1];
+        alert('Erro ao baixar o arquivo. Tente novamente.');
       }
     }
+  };
 
-    const blob = new Blob([response.data], { type: contentType });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (err) {
-    console.error('Error downloading file:', err);
-    alert('Erro ao baixar o arquivo. Tente novamente mais tarde.');
-  }
-};
 
   return (
     <div className="w-full">
@@ -139,8 +128,9 @@ function Content() {
               <CardContext
                 key={file.id}
                 id={file.id}
-                title={file.title || 'Sem título'} // Fallback para título vazio
-                description={file.description || ''} // Fallback para descrição vazia
+                title={file.title || 'Sem título'}
+                description={file.description || ''}
+                filename={file.filename} // ← Adicione isso
                 onDownload={handleDownload}
               />
             );
